@@ -39,15 +39,13 @@ def ejecutar_en_hilo_seguro(page: ft.Page, funcion_objetivo: Callable, *args, **
             # Notificamos a la UI insertando un mensaje en el hilo principal de Flet.
             # Usamos un SnackBar rojo para indicar fallo.
             error_msg = f"Error en la operación: {str(e)}"
-            page.snack_bar = ft.SnackBar(
-                content=ft.Text(error_msg, color=ft.colors.WHITE),
-                bgcolor=ft.colors.ERROR,
-                action="Aceptar",
+            page.open(
+                ft.SnackBar(
+                    content=ft.Text(error_msg, color=ft.colors.WHITE),
+                    bgcolor=ft.colors.ERROR,
+                    action="Aceptar",
+                )
             )
-            page.snack_bar.open = True
-
-            # Forzamos el refresco de la pantalla para mostrar la alerta inmediatamente.
-            page.update()
 
     # Lanzamos el hilo en modo daemon para que muera si se cierra la app principal.
     threading.Thread(target=wrapper, daemon=True).start()

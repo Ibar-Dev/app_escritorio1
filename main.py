@@ -40,17 +40,21 @@ def main(page: ft.Page):
 
     contenedor = ft.Column(expand=True, scroll=ft.ScrollMode.AUTO)
 
+    # Construimos las interfaces visuales una sola vez para evitar duplicar controles en el árbol.
+    vistas_ui = {
+        0: vista_tickets.construir(),
+        1: vista_facturas.construir(),
+        2: vista_ventas.construir(),
+        3: vista_email.construir(),
+    }
+
     def _mostrar(indice: int) -> None:
-        if indice == 0:
-            contenedor.controls = [vista_tickets.construir()]
-        elif indice == 1:
-            contenedor.controls = [vista_facturas.construir()]
-        elif indice == 2:
-            contenedor.controls = [vista_ventas.construir()]
+        contenedor.controls = [vistas_ui[indice]]
+
+        if indice == 2:
             vista_ventas.actualizar_resumen()
             vista_ventas.buscar()
-        else:
-            contenedor.controls = [vista_email.construir()]
+
         page.update()
 
     def cambiar_pestana(e: ft.ControlEvent) -> None:

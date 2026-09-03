@@ -453,7 +453,7 @@ class FacturasView:
 
         def _cerrar():
             try:
-                self.page.pop_dialog()
+                self.page.close(dlg)
             except Exception:
                 pass
 
@@ -500,7 +500,7 @@ class FacturasView:
             actions=acciones,
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self.page.show_dialog(dlg)
+        self.page.open(dlg)
 
     def _enviar_factura_email(self, factura: Factura, email_cliente: str = ""):
         if not email_cliente:
