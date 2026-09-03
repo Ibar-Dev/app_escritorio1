@@ -28,7 +28,7 @@ _TABS = [
 
 def main(page: ft.Page):
     page.title = "Zoo Picasso - App de escritorio"
-    page.window.state = ft.WindowState.MAXIMIZED
+    page.window.state = "maximized"
     page.padding = 16
 
     # Las vistas se crean una sola vez y conservan su estado al cambiar de pestana.
