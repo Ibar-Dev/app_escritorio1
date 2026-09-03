@@ -1,9 +1,11 @@
 import logging
+from decimal import Decimal
 from typing import Callable
 
 import flet as ft
 
 from escritorio.categorias import CATEGORIAS
+from src.money import parse
 from escritorio.registro import registrar_ventas_ticket
 from tickets_src.counter import peek_siguiente, rollback, siguiente_numero
 from tickets_src.excel_writer import guardar_ticket
@@ -102,7 +104,7 @@ class TicketsView:
             weight=ft.FontWeight.BOLD,
             color=ft.Colors.GREEN_700,
         )
-        self.total_dia = 0.0
+        self.total_dia: Decimal = Decimal("0.00")
         self.tickets_dia = 0
         self.lbl_tickets_dia = ft.Text(value="0", size=15, weight=ft.FontWeight.BOLD)
 
@@ -257,7 +259,7 @@ class TicketsView:
             return
 
         self.tickets_dia += 1
-        self.total_dia = round(self.total_dia + ticket.total, 2)
+        self.total_dia = parse(self.total_dia + ticket.total)
         self.lbl_tickets_dia.value = str(self.tickets_dia)
         self.lbl_acumulado_dia.value = f"{self.total_dia:.2f} EUR"
         self.resetear()
