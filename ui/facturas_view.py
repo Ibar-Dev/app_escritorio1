@@ -11,6 +11,7 @@ from typing import Callable
 import flet as ft
 
 from escritorio.categorias import CATEGORIAS, METODOS_PAGO
+from ui.thread_utils import ejecutar_en_hilo_seguro
 from escritorio.config_app import cargar_config_smtp, config_smtp_completa
 from escritorio.email_envio import enviar_factura_por_email
 from src.factura_counter import (
@@ -235,6 +236,11 @@ class FacturasView:
             width=280,
             on_click=self.abrir_carpeta,
         )
+        boton_prueba_error = ft.OutlinedButton(
+            "🧪 PRUEBA: Lanzar Error",
+            icon=ft.Icons.BUG_REPORT,
+            on_click=lambda _: ejecutar_en_hilo_seguro(self.page, self._prueba_error),
+        )
         return ft.Column(
             controls=[
                 cabecera,
@@ -251,7 +257,7 @@ class FacturasView:
                 ft.Divider(),
                 resumen_dia,
                 ft.Divider(),
-                ft.Row([self.boton_generar, boton_carpeta], alignment=ft.MainAxisAlignment.CENTER, spacing=12),
+                ft.Row([self.boton_generar, boton_carpeta, boton_prueba_error], alignment=ft.MainAxisAlignment.CENTER, spacing=12),
                 self.lbl_estado,
             ],
             spacing=10,
@@ -438,7 +444,7 @@ class FacturasView:
             self._estado(f"✓ Factura {factura.numero_formateado} guardada en: {ruta}", ft.Colors.GREEN_700)
             self._mostrar_dialogo_opciones()
 
-        threading.Thread(target=_guardar, daemon=True).start()
+        ejecutar_en_hilo_seguro(self.page, _guardar)
 
     def _mostrar_dialogo_opciones(self):
         factura = self.ultima_factura
@@ -465,7 +471,7 @@ class FacturasView:
                     self.resetear()
                     self._estado(f"Factura guardada, pero no se pudo imprimir: {ex}", ft.Colors.ORANGE_700)
 
-            threading.Thread(target=_hacer, daemon=True).start()
+            ejecutar_en_hilo_seguro(self.page, _hacer)
 
         def _enviar_email(_=None):
             _cerrar()
@@ -523,4 +529,12 @@ class FacturasView:
                 self._estado(f"No se pudo enviar la factura: {ex}", ft.Colors.RED_600)
                 logger.error("Error enviando factura %s: %s", factura.numero_formateado, ex, exc_info=True)
 
-        threading.Thread(target=_enviar, daemon=True).start()
+        ejecutar_en_hilo_seguro(self.page, _enviar)
+
+    def _prueba_error(self):
+        """
+        Función de prueba para verificar que el manejo de errores en hilos funciona correctamente.
+        Lanza un error intencionado para que el SnackBar rojo aparezca en la UI.
+        """
+        # Esto lanzará un ValueError que será capturado por ejecutar_en_hilo_seguro
+        raise ValueError("Esta es una prueba intencionada. El sistema de manejo de errores en hilos funciona correctamente.")

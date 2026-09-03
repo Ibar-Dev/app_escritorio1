@@ -4,6 +4,7 @@ import threading
 import flet as ft
 
 from escritorio.config_app import cargar_config_smtp, config_smtp_completa, guardar_config_smtp
+from ui.thread_utils import ejecutar_en_hilo_seguro
 from escritorio.email_envio import enviar_email_prueba
 
 logger = logging.getLogger(__name__)
@@ -140,7 +141,7 @@ class EmailView:
                 self._estado(f"No se pudo enviar la prueba: {e}", ft.Colors.RED_600)
                 logger.error("Error en email de prueba: %s", e, exc_info=True)
 
-        threading.Thread(target=_enviar, daemon=True).start()
+        ejecutar_en_hilo_seguro(self.page, _enviar)
 
     def _estado(self, mensaje: str, color: str):
         self.lbl_estado.value = mensaje

@@ -5,6 +5,7 @@ from datetime import date, timedelta
 import flet as ft
 
 from escritorio.categorias import CATEGORIAS, METODOS_PAGO
+from ui.thread_utils import ejecutar_en_hilo_seguro
 from escritorio.reportes import generar_reporte_historial, generar_reporte_mensual
 from src.ventas_store import (
     historial_ventas,
@@ -157,7 +158,7 @@ class VentasView:
                 logger.error("Error al calcular resumen: %s", e)
             self.page.update()
 
-        threading.Thread(target=_cargar, daemon=True).start()
+        ejecutar_en_hilo_seguro(self.page, _cargar)
 
     def buscar(self, _=None):
         try:
@@ -200,7 +201,7 @@ class VentasView:
             self._estado(f"{len(filas)} ventas encontradas en el periodo.", ft.Colors.BLUE_700)
             self.page.update()
 
-        threading.Thread(target=_consultar, daemon=True).start()
+        ejecutar_en_hilo_seguro(self.page, _consultar)
 
     def exportar_mes(self, _=None):
         self._estado("Generando reporte mensual…", ft.Colors.BLUE_700)
@@ -214,7 +215,7 @@ class VentasView:
                 self._estado(f"Error al generar el reporte: {e}", ft.Colors.RED_600)
                 logger.error("Error al exportar reporte mensual: %s", e, exc_info=True)
 
-        threading.Thread(target=_exportar, daemon=True).start()
+        ejecutar_en_hilo_seguro(self.page, _exportar)
 
     def exportar_historial(self, _=None):
         if not self.ultima_busqueda:
@@ -230,7 +231,7 @@ class VentasView:
                 self._estado(f"Error al exportar el historial: {e}", ft.Colors.RED_600)
                 logger.error("Error al exportar historial: %s", e, exc_info=True)
 
-        threading.Thread(target=_exportar, daemon=True).start()
+        ejecutar_en_hilo_seguro(self.page, _exportar)
 
     def _estado(self, mensaje: str, color: str):
         self.lbl_estado.value = mensaje
