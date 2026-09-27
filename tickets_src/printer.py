@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import time
+from decimal import Decimal
 
 from tickets_src.ticket_model import Ticket
 
@@ -46,16 +47,35 @@ def _imprimir(ticket: Ticket) -> None:
     from escpos.printer import Win32Raw
 
     p = Win32Raw(_PRINTER_NAME)
-    p.text("ZOO PICASSO\n".center(_ANCHO))
-    p.text(("─" * _ANCHO) + "\n")
-    p.text(f"Ticket #{ticket.numero:04d}\n".center(_ANCHO))
-    p.text(("─" * _ANCHO) + "\n")
+    separador = "-" * _ANCHO
+    ancho_concepto = _ANCHO - 10
+    lineas_validas: list[tuple[str, Decimal]] = []
     for linea in ticket.lineas:
-        nombre = linea.nombre[: _ANCHO - 10]
-        p.text(f"{nombre:<{_ANCHO - 10}} {linea.total:>8.2f}\n")
-    p.text(("─" * _ANCHO) + "\n")
-    p.text(f"{'TOTAL':>{_ANCHO - 10}} {ticket.total:>8.2f} EUR\n")
-    p.text("\nGracias por su visita\n".center(_ANCHO))
+        nombre = (linea.nombre or "").strip()
+        total_linea = Decimal(linea.total)
+        if not nombre or total_linea <= 0:
+            continue
+        lineas_validas.append((nombre[:ancho_concepto], total_linea))
+
+    subtotal_impreso = sum((total for _, total in lineas_validas), start=Decimal("0.00"))
+    metodo_pago = (ticket.metodo_pago or "efectivo").strip().lower()
+    metodo_pago_txt = {
+        "efectivo": "EFECTIVO",
+        "tarjeta": "TARJETA",
+    }.get(metodo_pago, metodo_pago.upper() or "EFECTIVO")
+
+    p.text("ZOO PICASSO\n".center(_ANCHO))
+    p.text(separador + "\n")
+    p.text(f"Ticket #{ticket.numero:04d}\n".center(_ANCHO))
+    p.text(separador + "\n")
+    for nombre, total_linea in lineas_validas:
+        p.text(f"{nombre:<{ancho_concepto}} {total_linea:>8.2f}\n")
+    p.text(separador + "\n")
+    p.text(f"{'SUBTOTAL':>{ancho_concepto}} {subtotal_impreso:>8.2f}\n")
+    p.text(f"{'METODO PAGO':>{ancho_concepto}} {metodo_pago_txt:>8}\n")
+    p.text(separador + "\n")
+    p.text(f"{'TOTAL':>{ancho_concepto}} {subtotal_impreso:>8.2f} EUR\n")
+    p.text("Gracias por su visita\n".center(_ANCHO))
     p.cut()
     p.close()
     logger.info("Ticket T-%04d impreso.", ticket.numero)

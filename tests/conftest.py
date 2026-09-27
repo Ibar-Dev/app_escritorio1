@@ -45,7 +45,16 @@ def tmp_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 def mock_escpos():
     """Evita importar python-escpos (requiere hardware USB)."""
     fake_printer = MagicMock()
-    with patch.dict("sys.modules", {"escpos": MagicMock(), "escpos.printer": MagicMock(Usb=MagicMock(return_value=fake_printer))}):
+    with patch.dict(
+        "sys.modules",
+        {
+            "escpos": MagicMock(),
+            "escpos.printer": MagicMock(
+                Usb=MagicMock(return_value=fake_printer),
+                Win32Raw=MagicMock(return_value=fake_printer),
+            ),
+        },
+    ):
         yield fake_printer
 
 

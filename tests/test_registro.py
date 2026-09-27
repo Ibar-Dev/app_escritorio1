@@ -30,3 +30,13 @@ class TestRegistrarVentasTicket:
         registrar_ventas_ticket(1, [(None, 10.0)], "u")
         filas = historial_ventas("2026-01-01", "2099-12-31")
         assert "sin_categoria" in filas[0]["categorias"]
+
+    def test_guarda_metodo_pago(self):
+        registrar_ventas_ticket(9, [("perro", 10.0)], "u", "tarjeta")
+        filas = historial_ventas("2026-01-01", "2099-12-31")
+        assert filas[0]["metodo_pago"] == "tarjeta"
+
+    def test_metodo_pago_por_defecto_vacio(self):
+        registrar_ventas_ticket(10, [("perro", 8.0)], "u")
+        filas = historial_ventas("2026-01-01", "2099-12-31")
+        assert filas[0]["metodo_pago"] == ""

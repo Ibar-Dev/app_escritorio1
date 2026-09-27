@@ -71,6 +71,7 @@ def registrar_ventas_factura(
     created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     fecha = factura.fecha.isoformat()
     anio_mes = factura.fecha.strftime("%Y-%m")
+    metodo_pago = (pago.metodo_pago or "efectivo").strip().lower()
     registros = [
         (
             factura.numero_formateado,
@@ -81,7 +82,7 @@ def registrar_ventas_factura(
             (factura.cliente_nombre or "").strip(),
             (usuario or "").strip(),
             created_at,
-            pago.metodo_pago,
+            metodo_pago,
         )
         for linea in factura.lineas
     ]

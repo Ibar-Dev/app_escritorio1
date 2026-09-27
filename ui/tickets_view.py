@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 from decimal import Decimal
 from typing import Callable
 
@@ -6,6 +7,7 @@ import flet as ft
 
 from escritorio.categorias import CATEGORIAS
 from src.money import parse
+from src.ventas_store import resumen_ventas_dia
 from escritorio.registro import registrar_ventas_ticket
 from tickets_src.counter import peek_siguiente, rollback, siguiente_numero
 from tickets_src.excel_writer import guardar_ticket
@@ -107,9 +109,28 @@ class TicketsView:
         self.total_dia: Decimal = Decimal("0.00")
         self.tickets_dia = 0
         self.lbl_tickets_dia = ft.Text(value="0", size=15, weight=ft.FontWeight.BOLD)
+        self.dd_metodo_pago = ft.Dropdown(
+            label="Metodo de pago",
+            width=180,
+            value="efectivo",
+            options=[
+                ft.dropdown.Option(key="efectivo", text="Efectivo"),
+                ft.dropdown.Option(key="tarjeta", text="Tarjeta"),
+            ],
+        )
+        self.atajos_rapidos: list[tuple[str, str]] = [
+            ("Comida", "animal"),
+            ("Chuches", "animal"),
+            ("Accesorios", "animal"),
+            ("Peluquería", "peluqueria"),
+            ("Veterinaria", "animal"),
+        ]
+        self.switch_imprimir = ft.Switch(label="Imprimir ticket en papel", value=False)
+        self._refrescar_resumen_dia()
 
     # ── Construccion ──────────────────────────────────────────────────────────
     def construir(self) -> ft.Control:
+        self._refrescar_resumen_dia()
         if not self.filas:
             self.agregar_fila()
         cabecera = ft.Column(
@@ -126,6 +147,20 @@ class TicketsView:
                 ft.OutlinedButton("- Quitar línea", icon=ft.Icons.REMOVE, on_click=self.quitar_fila),
             ],
             alignment=ft.MainAxisAlignment.START,
+        )
+        fila_atajos = ft.Row(
+            controls=[
+                ft.Text("Atajos:", size=13, weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_700),
+                *[
+                    ft.OutlinedButton(
+                        concepto,
+                        on_click=lambda _, c=concepto, cat=categoria: self._agregar_atajo(c, cat),
+                    )
+                    for concepto, categoria in self.atajos_rapidos
+                ],
+            ],
+            spacing=6,
+            wrap=True,
         )
         fila_total = ft.Row(
             controls=[
@@ -144,27 +179,33 @@ class TicketsView:
             alignment=ft.MainAxisAlignment.END,
             spacing=8,
         )
-        self.boton_imprimir = ft.Button(
-            "GUARDAR E IMPRIMIR TICKET",
-            icon=ft.Icons.PRINT,
+        self.boton_guardar = ft.Button(
+            "GUARDAR VENTA",
+            icon=ft.Icons.SAVE,
             bgcolor=ft.Colors.GREEN_700,
             color=ft.Colors.WHITE,
             height=52,
             width=320,
-            on_click=self.imprimir,
+            on_click=self.guardar,
         )
         return ft.Column(
             controls=[
                 cabecera,
                 ft.Divider(),
                 self.contenedor_filas,
+                fila_atajos,
                 botones_filas,
                 ft.Divider(),
                 fila_total,
+                ft.Row(
+                    controls=[self.dd_metodo_pago, self.switch_imprimir],
+                    alignment=ft.MainAxisAlignment.START,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
                 ft.Divider(),
                 resumen_dia,
                 ft.Divider(),
-                ft.Row([self.boton_imprimir], alignment=ft.MainAxisAlignment.CENTER),
+                ft.Row([self.boton_guardar], alignment=ft.MainAxisAlignment.CENTER),
                 self.lbl_estado,
             ],
             spacing=10,
@@ -201,7 +242,9 @@ class TicketsView:
         self.numero_ticket = peek_siguiente()
         self.lbl_numero.value = f"Ticket #{self.numero_ticket:04d}"
         self.lbl_estado.value = ""
-        self.boton_imprimir.disabled = False
+        self.dd_metodo_pago.value = "efectivo"
+        self.switch_imprimir.value = False
+        self.boton_guardar.disabled = False
         self.agregar_fila()
         self.actualizar_total()
 
@@ -210,25 +253,45 @@ class TicketsView:
         self.lbl_estado.color = color
         self.page.update()
 
-    def imprimir(self, _=None):
+    def _refrescar_resumen_dia(self):
+        resumen = resumen_ventas_dia(date.today().isoformat())
+        self.total_dia = parse(resumen["total"])
+        self.tickets_dia = int(resumen["cantidad_ventas"])
+        self.lbl_tickets_dia.value = str(self.tickets_dia)
+        self.lbl_acumulado_dia.value = f"{self.total_dia:.2f} EUR"
+
+    def _agregar_atajo(self, nombre_servicio: str, categoria: str):
+        self.agregar_fila()
+        fila = self.filas[-1]
+        fila.nombre.value = nombre_servicio
+        if categoria in CATEGORIAS:
+            fila.categoria.value = categoria
+        fila._recalcular(self.actualizar_total)
+        self.page.update()
+
+    def guardar(self, _=None):
         try:
             lineas = [f.a_linea_ticket() for f in self.filas]
         except ValueError as e:
             self._estado(str(e), ft.Colors.RED_600)
             return
 
-        self.boton_imprimir.disabled = True
+        self.boton_guardar.disabled = True
         self.page.update()
         numero = siguiente_numero()
         self.numero_ticket = numero
         self.lbl_numero.value = f"Ticket #{numero:04d}"
-        ticket = Ticket(numero=numero, lineas=lineas)
+        ticket = Ticket(
+            numero=numero,
+            lineas=lineas,
+            metodo_pago=(self.dd_metodo_pago.value or "").strip().lower(),
+        )
 
         try:
             guardar_ticket(ticket)
         except Exception as e:
             rollback()
-            self.boton_imprimir.disabled = False
+            self.boton_guardar.disabled = False
             self._estado(f"Error al guardar en Excel: {e}", ft.Colors.RED_600)
             logger.error("Error al guardar ticket #%s: %s", ticket.numero, e)
             return
@@ -242,28 +305,30 @@ class TicketsView:
                     for fila, linea in zip(self.filas, lineas)
                 ],
                 self.usuario,
+                ticket.metodo_pago,
             )
         except Exception as e:
             logger.error("No se pudo registrar la venta del ticket #%s: %s", ticket.numero, e)
             aviso_bd = f"⚠ Ticket guardado, pero venta no registrada en BD: {e}"
 
-        try:
-            imprimir_ticket(ticket)
-        except ConnectionError as e:
-            self.boton_imprimir.disabled = False
-            self._estado(f"Ticket guardado, pero error de impresora: {e}", ft.Colors.ORANGE_700)
-            return
-        except Exception as e:
-            self.boton_imprimir.disabled = False
-            self._estado(f"Ticket guardado, pero error al imprimir: {e}", ft.Colors.ORANGE_700)
-            return
+        aviso_print: str | None = None
+        if self.switch_imprimir.value:
+            try:
+                imprimir_ticket(ticket)
+            except ConnectionError as e:
+                aviso_print = f"⚠ Ticket guardado, pero error de impresora: {e}"
+            except Exception as e:
+                aviso_print = f"⚠ Ticket guardado, pero error al imprimir: {e}"
 
-        self.tickets_dia += 1
-        self.total_dia = parse(self.total_dia + ticket.total)
-        self.lbl_tickets_dia.value = str(self.tickets_dia)
-        self.lbl_acumulado_dia.value = f"{self.total_dia:.2f} EUR"
+        self._refrescar_resumen_dia()
         self.resetear()
-        if aviso_bd:
+        if aviso_bd and aviso_print:
+            self._estado(f"{aviso_bd} | {aviso_print}", ft.Colors.ORANGE_700)
+        elif aviso_bd:
             self._estado(aviso_bd, ft.Colors.ORANGE_700)
+        elif aviso_print:
+            self._estado(aviso_print, ft.Colors.ORANGE_700)
+        elif self.switch_imprimir.value:
+            self._estado(f"✓ Ticket #{ticket.numero:04d} guardado e impreso correctamente.", ft.Colors.GREEN_700)
         else:
-            self._estado(f"✓ Ticket #{ticket.numero:04d} impreso y guardado correctamente.", ft.Colors.GREEN_700)
+            self._estado(f"✓ Ticket #{ticket.numero:04d} guardado correctamente.", ft.Colors.GREEN_700)

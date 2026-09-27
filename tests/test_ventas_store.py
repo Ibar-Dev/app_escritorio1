@@ -15,6 +15,7 @@ from src.ventas_store import (
     resumen_ventas_dia,
     ventas_activas_detalle,
 )
+from escritorio.registro import registrar_ventas_ticket
 
 
 def _factura(numero=1, fecha=date(2026, 6, 15), lineas=None, cliente="Cliente Test"):
@@ -110,6 +111,18 @@ class TestResumen:
         r = resumen_ventas_dia("2026-06-01")
         assert r["total"] == 0.0
         assert r["cantidad_ventas"] == 0
+
+    def test_resumen_dia_incluye_factura_y_ticket(self):
+        hoy = date.today()
+        registrar_ventas_factura(
+            _factura(numero=1, fecha=hoy, lineas=[LineaFactura("A", 1, 12.0, "perro")]),
+            "u",
+            _pago(12.0, "efectivo"),
+        )
+        registrar_ventas_ticket(2, [("perro", 8.0)], "u", "tarjeta")
+        r = resumen_ventas_dia(hoy.isoformat())
+        assert r["total"] == 20.0
+        assert r["cantidad_ventas"] == 2
 
 
 class TestDetalle:

@@ -26,6 +26,7 @@ def registrar_ventas_ticket(
     numero_ticket: int,
     filas: list[tuple[str, float]],
     usuario: str = "",
+    metodo_pago: str = "",
 ) -> None:
     """Registra las lineas de un ticket en ventas.db para el control de ventas.
 
@@ -47,6 +48,7 @@ def registrar_ventas_ticket(
             "",
             (usuario or "").strip(),
             created_at,
+            (metodo_pago or "").strip(),
         )
         for categoria, monto in filas
     ]
@@ -57,8 +59,8 @@ def registrar_ventas_ticket(
             """
             INSERT INTO ventas (
                 numero_factura, fecha_venta, anio_mes, categoria, monto,
-                cliente_nombre, usuario, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                cliente_nombre, usuario, created_at, metodo_pago
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             registros,
         )

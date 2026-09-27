@@ -41,3 +41,11 @@ class TestGuardarTicket:
         ws = wb.active
         primera_celda = ws.cell(row=2, column=1).value
         assert primera_celda == "T-0042"
+
+    def test_ticket_metodo_pago_en_modelo(self):
+        t = Ticket(numero=1, lineas=[LineaTicket("Baño", 1, 25.0)], metodo_pago="efectivo")
+        assert t.metodo_pago == "efectivo"
+
+    def test_ticket_subtotal_equivale_total(self):
+        t = Ticket(numero=1, lineas=[LineaTicket("Baño", 1, 25.0), LineaTicket("Corte", 1, 15.0)])
+        assert t.subtotal == t.total == 40

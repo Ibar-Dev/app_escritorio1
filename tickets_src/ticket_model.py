@@ -26,6 +26,14 @@ class LineaTicket:
 class Ticket:
     numero: int
     lineas: list[LineaTicket] = field(default_factory=list)
+    metodo_pago: str = "efectivo"
+    subtotal: float = 0.0
+
+    def __post_init__(self) -> None:
+        # Si no se informa subtotal, se inicializa desde las lineas actuales.
+        if self.subtotal == 0.0 and self.lineas:
+            self.subtotal = float(self.total)
+        self.metodo_pago = (self.metodo_pago or "efectivo").strip().lower()
 
     @property
     def total(self) -> Decimal:
