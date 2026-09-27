@@ -11,7 +11,7 @@ from typing import Callable
 import flet as ft
 
 from escritorio.categorias import CATEGORIAS, METODOS_PAGO
-from ui.thread_utils import ejecutar_en_hilo_seguro
+from ui.thread_utils import ejecutar_en_hilo_seguro, ejecutar_en_hilo_ui
 from escritorio.config_app import cargar_config_smtp, config_smtp_completa
 from escritorio.email_envio import enviar_factura_por_email
 from src.factura_counter import (
@@ -322,12 +322,16 @@ class FacturasView:
         self.txt_tarjeta.value = ""
         self.txt_entregado.value = ""
         self.lbl_cambio.value = "Cambio: 0.00 €"
-        self.numero_factura = peek_siguiente_numero_factura()
-        self.lbl_numero.value = f"Factura  {date.today().year}-{self.numero_factura:03d}"
+        self._sincronizar_numero_factura_visual()
         self.lbl_estado.value = ""
         self.boton_generar.disabled = False
         self.agregar_fila()
         self.actualizar_totales()
+
+    def _sincronizar_numero_factura_visual(self):
+        self.numero_factura = peek_siguiente_numero_factura()
+        self.lbl_numero.value = f"Factura  {date.today().year}-{self.numero_factura:03d}"
+        self.page.update()
 
     def abrir_carpeta(self, _=None):
         try:
@@ -419,6 +423,7 @@ class FacturasView:
                 ruta = generar_factura_xlsx(factura)
             except Exception as ex:
                 rollback_numero_factura()
+                ejecutar_en_hilo_ui(self.page, self._sincronizar_numero_factura_visual)
                 self.boton_generar.disabled = False
                 self._estado(f"Error al generar factura: {ex}", ft.Colors.RED_600)
                 logger.error("Error al generar factura %s: %s", factura.numero_formateado, ex, exc_info=True)
@@ -429,6 +434,7 @@ class FacturasView:
             except Exception as ex:
                 ruta.unlink(missing_ok=True)
                 rollback_numero_factura()
+                ejecutar_en_hilo_ui(self.page, self._sincronizar_numero_factura_visual)
                 self.boton_generar.disabled = False
                 self._estado(f"Error al registrar la venta, factura eliminada: {ex}", ft.Colors.RED_600)
                 logger.error("Error al registrar venta %s: %s", factura.numero_formateado, ex, exc_info=True)
@@ -441,6 +447,7 @@ class FacturasView:
 
             self.ultima_factura = factura
             self.ultima_ruta = ruta
+            ejecutar_en_hilo_ui(self.page, self._sincronizar_numero_factura_visual)
             self._estado(f"✓ Factura {factura.numero_formateado} guardada en: {ruta}", ft.Colors.GREEN_700)
             self._mostrar_dialogo_opciones()
 

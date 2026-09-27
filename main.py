@@ -14,6 +14,7 @@ import src.settings  # noqa: E402  # logging centralizado y rutas
 from ui.email_view import EmailView  # noqa: E402
 from ui.facturas_view import FacturasView  # noqa: E402
 from ui.tickets_view import TicketsView  # noqa: E402
+from ui.thread_utils import drenar_tareas_ui_pendientes  # noqa: E402
 from ui.ventas_view import VentasView  # noqa: E402
 
 _OPERADORA = "Giselle"
@@ -48,6 +49,7 @@ def main(page: ft.Page):
     }
 
     def _mostrar(indice: int) -> None:
+        drenar_tareas_ui_pendientes()
         contenedor.controls = [vistas_ui[indice]]
 
         if indice == 2:
@@ -55,6 +57,7 @@ def main(page: ft.Page):
             vista_ventas.buscar()
 
         page.update()
+        drenar_tareas_ui_pendientes()
 
     def cambiar_pestana(e: ft.ControlEvent) -> None:
         _mostrar(e.control.selected_index)
@@ -78,6 +81,7 @@ def main(page: ft.Page):
 
     page.add(ft.Row(controls=[rail, ft.VerticalDivider(width=1), contenedor], expand=True))
     _mostrar(0)
+    drenar_tareas_ui_pendientes()
     page.update()
 
 
