@@ -62,6 +62,7 @@ def _imprimir(ticket: Ticket) -> None:
     metodo_pago_txt = {
         "efectivo": "EFECTIVO",
         "tarjeta": "TARJETA",
+        "mixto": "MIXTO",
     }.get(metodo_pago, metodo_pago.upper() or "EFECTIVO")
 
     p.text("ZOO PICASSO\n".center(_ANCHO))

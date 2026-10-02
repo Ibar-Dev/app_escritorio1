@@ -9,6 +9,7 @@ from escritorio.categorias import CATEGORIAS
 from src.money import parse
 from src.ventas_store import resumen_ventas_dia
 from escritorio.registro import registrar_ventas_ticket
+from escritorio.categorias import METODOS_PAGO
 from tickets_src.counter import peek_siguiente, rollback, siguiente_numero
 from tickets_src.excel_writer import guardar_ticket
 from tickets_src.printer import imprimir_ticket
@@ -113,10 +114,7 @@ class TicketsView:
             label="Metodo de pago",
             width=180,
             value="efectivo",
-            options=[
-                ft.dropdown.Option(key="efectivo", text="Efectivo"),
-                ft.dropdown.Option(key="tarjeta", text="Tarjeta"),
-            ],
+            options=[ft.dropdown.Option(key=v, text=v.capitalize()) for v in METODOS_PAGO],
         )
         self.atajos_rapidos: list[tuple[str, str]] = [
             ("Comida", "animal"),
