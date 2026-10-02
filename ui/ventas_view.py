@@ -60,6 +60,7 @@ class VentasView:
         self.lbl_efectivo = ft.Text(value="—", size=13)
         self.lbl_tarjeta = ft.Text(value="—", size=13)
         self.lbl_periodo = ft.Text(value="Periodo: —", size=11, color=ft.Colors.GREY_700)
+        self.lbl_delta_comp = ft.Text(value="Δ vs mes: —", size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_700)
         self.lbl_total_mes_cal = ft.Text(value="—", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.ORANGE_800)
         self.lbl_ventas_mes_cal = ft.Text(value="—", size=13)
         self.lbl_efectivo_mes_cal = ft.Text(value="—", size=13)
@@ -105,6 +106,7 @@ class VentasView:
                             self.lbl_total_mes,
                             self.lbl_ventas_mes,
                             self.lbl_periodo,
+                            self.lbl_delta_comp,
                             ft.Row(
                                 controls=[
                                     ft.Text("Efectivo:", size=12),
@@ -233,6 +235,7 @@ class VentasView:
         self.lbl_efectivo.value = f"{resumen['total_efectivo']:.2f} €"
         self.lbl_tarjeta.value = f"{resumen['total_tarjeta']:.2f} €"
         self.lbl_periodo.value = f"Periodo: {desde} a {hasta}"
+        return resumen
 
     def _periodo_mes_actual(self) -> tuple[str, str]:
         hoy = date.today()
@@ -249,6 +252,25 @@ class VentasView:
         self.lbl_efectivo_mes_cal.value = f"{resumen['total_efectivo']:.2f} €"
         self.lbl_tarjeta_mes_cal.value = f"{resumen['total_tarjeta']:.2f} €"
         self.lbl_periodo_mes_cal.value = f"Periodo: {desde_mes} a {hasta_mes}"
+        return resumen
+
+    def _actualizar_delta_comparativo(self, total_rango: float, total_mes: float) -> None:
+        delta = round(total_rango - total_mes, 2)
+        if total_mes == 0:
+            if total_rango == 0:
+                pct_txt = "0.00%"
+            else:
+                pct_txt = "n/a"
+        else:
+            pct = round((delta / total_mes) * 100, 2)
+            pct_txt = f"{pct:+.2f}%"
+        self.lbl_delta_comp.value = f"Δ vs mes: {delta:+.2f} € ({pct_txt})"
+        if delta > 0:
+            self.lbl_delta_comp.color = ft.Colors.GREEN_700
+        elif delta < 0:
+            self.lbl_delta_comp.color = ft.Colors.RED_700
+        else:
+            self.lbl_delta_comp.color = ft.Colors.GREY_700
 
     def actualizar_resumen(self):
         self.actualizar_resumen_hoy()
@@ -260,8 +282,9 @@ class VentasView:
 
         def _cargar() -> None:
             try:
-                self._actualizar_resumen_rango(desde, hasta, categoria, metodo_pago)
-                self._actualizar_resumen_mes_calendario(categoria, metodo_pago)
+                resumen_rango = self._actualizar_resumen_rango(desde, hasta, categoria, metodo_pago)
+                resumen_mes = self._actualizar_resumen_mes_calendario(categoria, metodo_pago)
+                self._actualizar_delta_comparativo(resumen_rango["total"], resumen_mes["total"])
             except Exception as e:
                 logger.error("Error al calcular resumen de rango: %s", e)
             self.page.update()
@@ -284,8 +307,9 @@ class VentasView:
                     categoria,
                     metodo_pago,
                 )
-                self._actualizar_resumen_rango(desde, hasta, categoria, metodo_pago)
-                self._actualizar_resumen_mes_calendario(categoria, metodo_pago)
+                resumen_rango = self._actualizar_resumen_rango(desde, hasta, categoria, metodo_pago)
+                resumen_mes = self._actualizar_resumen_mes_calendario(categoria, metodo_pago)
+                self._actualizar_delta_comparativo(resumen_rango["total"], resumen_mes["total"])
             except Exception as e:
                 self._estado(f"Error al consultar el historial: {e}", ft.Colors.RED_600)
                 return
