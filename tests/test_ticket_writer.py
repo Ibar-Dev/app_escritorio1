@@ -1,6 +1,8 @@
 """Tests para tickets_src.excel_writer — workbook acumulativo."""
 from __future__ import annotations
 
+from decimal import Decimal
+
 import openpyxl
 import pytest
 
@@ -49,3 +51,53 @@ class TestGuardarTicket:
     def test_ticket_subtotal_equivale_total(self):
         t = Ticket(numero=1, lineas=[LineaTicket("Baño", 1, 25.0), LineaTicket("Corte", 1, 15.0)])
         assert t.subtotal == t.total == 40
+
+    def test_ticket_mixto_valido(self):
+        t = Ticket(
+            numero=1,
+            lineas=[LineaTicket("Baño", 1, 25.0), LineaTicket("Corte", 1, 15.0)],
+            metodo_pago="mixto",
+            monto_efectivo=20.0,
+            monto_tarjeta=20.0,
+        )
+        assert t.metodo_pago == "mixto"
+        assert t.monto_efectivo == Decimal("20.00")
+        assert t.monto_tarjeta == Decimal("20.00")
+
+    def test_ticket_mixto_invalido_suma(self):
+        with pytest.raises(ValueError, match="debe ser igual al total"):
+            Ticket(
+                numero=1,
+                lineas=[LineaTicket("Baño", 1, 25.0), LineaTicket("Corte", 1, 15.0)],
+                metodo_pago="mixto",
+                monto_efectivo=10.0,
+                monto_tarjeta=20.0,
+            )
+
+    def test_ticket_mixto_invalido_cero(self):
+        with pytest.raises(ValueError, match="mayor a 0"):
+            Ticket(
+                numero=1,
+                lineas=[LineaTicket("Baño", 1, 25.0)],
+                metodo_pago="mixto",
+                monto_efectivo=0.0,
+                monto_tarjeta=25.0,
+            )
+
+    def test_ticket_efectivo_asigna_montos(self):
+        t = Ticket(
+            numero=1,
+            lineas=[LineaTicket("Baño", 1, 25.0)],
+            metodo_pago="efectivo",
+        )
+        assert t.monto_efectivo == Decimal("25.00")
+        assert t.monto_tarjeta == Decimal("0.00")
+
+    def test_ticket_tarjeta_asigna_montos(self):
+        t = Ticket(
+            numero=1,
+            lineas=[LineaTicket("Baño", 1, 25.0)],
+            metodo_pago="tarjeta",
+        )
+        assert t.monto_efectivo == Decimal("0.00")
+        assert t.monto_tarjeta == Decimal("25.00")

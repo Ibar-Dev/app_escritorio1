@@ -5,11 +5,10 @@ from typing import Callable
 
 import flet as ft
 
-from escritorio.categorias import CATEGORIAS
+from escritorio.categorias import CATEGORIAS, METODOS_PAGO
 from src.money import parse
 from src.ventas_store import resumen_ventas_dia
 from escritorio.registro import registrar_ventas_ticket
-from escritorio.categorias import METODOS_PAGO
 from tickets_src.counter import peek_siguiente, rollback, siguiente_numero
 from tickets_src.excel_writer import guardar_ticket
 from tickets_src.printer import imprimir_ticket
@@ -115,6 +114,25 @@ class TicketsView:
             width=180,
             value="efectivo",
             options=[ft.dropdown.Option(key=v, text=v.capitalize()) for v in METODOS_PAGO],
+            on_change=self._on_metodo_pago_change,
+        )
+        self.txt_mixto_efectivo = ft.TextField(
+            label="Efectivo (EUR)",
+            width=150,
+            keyboard_type=ft.KeyboardType.NUMBER,
+            visible=False,
+        )
+        self.txt_mixto_tarjeta = ft.TextField(
+            label="Tarjeta (EUR)",
+            width=150,
+            keyboard_type=ft.KeyboardType.NUMBER,
+            visible=False,
+        )
+        self.fila_mixto = ft.Row(
+            controls=[self.txt_mixto_efectivo, self.txt_mixto_tarjeta],
+            alignment=ft.MainAxisAlignment.START,
+            spacing=8,
+            visible=False,
         )
         self.atajos_rapidos: list[tuple[str, str]] = [
             ("Comida", "animal"),
@@ -200,6 +218,7 @@ class TicketsView:
                     alignment=ft.MainAxisAlignment.START,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
+                self.fila_mixto,
                 ft.Divider(),
                 resumen_dia,
                 ft.Divider(),
@@ -241,10 +260,34 @@ class TicketsView:
         self.lbl_numero.value = f"Ticket #{self.numero_ticket:04d}"
         self.lbl_estado.value = ""
         self.dd_metodo_pago.value = "efectivo"
+        self.txt_mixto_efectivo.value = ""
+        self.txt_mixto_tarjeta.value = ""
+        self.fila_mixto.visible = False
+        self.txt_mixto_efectivo.visible = False
+        self.txt_mixto_tarjeta.visible = False
         self.switch_imprimir.value = False
         self.boton_guardar.disabled = False
         self.agregar_fila()
         self.actualizar_total()
+
+    def _on_metodo_pago_change(self, _=None):
+        es_mixto = (self.dd_metodo_pago.value or "").strip().lower() == "mixto"
+        self.fila_mixto.visible = es_mixto
+        self.txt_mixto_efectivo.visible = es_mixto
+        self.txt_mixto_tarjeta.visible = es_mixto
+        if not es_mixto:
+            self.txt_mixto_efectivo.value = ""
+            self.txt_mixto_tarjeta.value = ""
+        self.page.update()
+
+    def _monto_desde_campo(self, texto: str, nombre: str) -> Decimal:
+        bruto = (texto or "").strip()
+        if not bruto:
+            raise ValueError(f"Indica el monto en {nombre}.")
+        try:
+            return parse(bruto.replace(",", "."))
+        except Exception as e:
+            raise ValueError(f"Monto invalido en {nombre}.") from e
 
     def _estado(self, mensaje: str, color: str):
         self.lbl_estado.value = mensaje
@@ -274,16 +317,42 @@ class TicketsView:
             self._estado(str(e), ft.Colors.RED_600)
             return
 
+        metodo_pago = (self.dd_metodo_pago.value or "").strip().lower()
+        monto_efectivo = Decimal("0.00")
+        monto_tarjeta = Decimal("0.00")
+        if metodo_pago == "mixto":
+            total_ticket = parse(sum(l.total for l in lineas))
+            try:
+                monto_efectivo = self._monto_desde_campo(self.txt_mixto_efectivo.value, "efectivo")
+                monto_tarjeta = self._monto_desde_campo(self.txt_mixto_tarjeta.value, "tarjeta")
+            except ValueError as e:
+                self._estado(str(e), ft.Colors.RED_600)
+                return
+            if monto_efectivo <= 0 or monto_tarjeta <= 0:
+                self._estado("En pago mixto, efectivo y tarjeta deben ser mayores a 0.", ft.Colors.RED_600)
+                return
+            if parse(monto_efectivo + monto_tarjeta) != total_ticket:
+                self._estado("En pago mixto, efectivo + tarjeta debe ser igual al total.", ft.Colors.RED_600)
+                return
+
         self.boton_guardar.disabled = True
         self.page.update()
         numero = siguiente_numero()
         self.numero_ticket = numero
         self.lbl_numero.value = f"Ticket #{numero:04d}"
-        ticket = Ticket(
-            numero=numero,
-            lineas=lineas,
-            metodo_pago=(self.dd_metodo_pago.value or "").strip().lower(),
-        )
+        try:
+            ticket = Ticket(
+                numero=numero,
+                lineas=lineas,
+                metodo_pago=metodo_pago,
+                monto_efectivo=monto_efectivo,
+                monto_tarjeta=monto_tarjeta,
+            )
+        except ValueError as e:
+            rollback()
+            self.boton_guardar.disabled = False
+            self._estado(str(e), ft.Colors.RED_600)
+            return
 
         try:
             guardar_ticket(ticket)
@@ -327,6 +396,18 @@ class TicketsView:
         elif aviso_print:
             self._estado(aviso_print, ft.Colors.ORANGE_700)
         elif self.switch_imprimir.value:
-            self._estado(f"✓ Ticket #{ticket.numero:04d} guardado e impreso correctamente.", ft.Colors.GREEN_700)
+            if ticket.metodo_pago == "mixto":
+                self._estado(
+                    f"✓ Ticket #{ticket.numero:04d} guardado e impreso. Mixto: {ticket.monto_efectivo:.2f} EUR efectivo + {ticket.monto_tarjeta:.2f} EUR tarjeta.",
+                    ft.Colors.GREEN_700,
+                )
+            else:
+                self._estado(f"✓ Ticket #{ticket.numero:04d} guardado e impreso correctamente.", ft.Colors.GREEN_700)
         else:
-            self._estado(f"✓ Ticket #{ticket.numero:04d} guardado correctamente.", ft.Colors.GREEN_700)
+            if ticket.metodo_pago == "mixto":
+                self._estado(
+                    f"✓ Ticket #{ticket.numero:04d} guardado. Mixto: {ticket.monto_efectivo:.2f} EUR efectivo + {ticket.monto_tarjeta:.2f} EUR tarjeta.",
+                    ft.Colors.GREEN_700,
+                )
+            else:
+                self._estado(f"✓ Ticket #{ticket.numero:04d} guardado correctamente.", ft.Colors.GREEN_700)
