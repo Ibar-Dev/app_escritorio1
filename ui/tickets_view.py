@@ -114,7 +114,7 @@ class TicketsView:
             width=180,
             value="efectivo",
             options=[ft.dropdown.Option(key=v, text=v.capitalize()) for v in METODOS_PAGO],
-            on_change=self._on_metodo_pago_change,
+            on_select=self._on_metodo_pago_change,
         )
         self.txt_mixto_efectivo = ft.TextField(
             label="Efectivo (EUR)",
