@@ -13,6 +13,7 @@ from src.ventas_store import (
     registrar_ventas_factura,
     resumen_ventas_activas,
     resumen_ventas_dia,
+    resumen_ventas_rango,
     ventas_activas_detalle,
 )
 from escritorio.registro import registrar_ventas_ticket
@@ -123,6 +124,37 @@ class TestResumen:
         r = resumen_ventas_dia(hoy.isoformat())
         assert r["total"] == 20.0
         assert r["cantidad_ventas"] == 2
+
+    def test_resumen_rango_totaliza_y_cuenta(self):
+        registrar_ventas_factura(_factura(numero=1, fecha=date(2026, 6, 10)), "u", _pago(20.0, "efectivo"))
+        registrar_ventas_factura(_factura(numero=2, fecha=date(2026, 6, 15)), "u", _pago(20.0, "tarjeta"))
+        registrar_ventas_factura(_factura(numero=3, fecha=date(2026, 7, 1)), "u", _pago(20.0, "efectivo"))
+
+        r = resumen_ventas_rango("2026-06-01", "2026-06-30")
+
+        assert r["total"] == 40.0
+        assert r["cantidad_ventas"] == 2
+        assert r["total_efectivo"] == 20.0
+        assert r["total_tarjeta"] == 20.0
+
+    def test_resumen_rango_respeta_filtros(self):
+        registrar_ventas_factura(
+            _factura(numero=1, lineas=[LineaFactura("A", 1, 10.0, "perro")]),
+            "u",
+            _pago(10.0, "efectivo"),
+        )
+        registrar_ventas_factura(
+            _factura(numero=2, lineas=[LineaFactura("B", 1, 15.0, "gato")]),
+            "u",
+            _pago(15.0, "tarjeta"),
+        )
+
+        r = resumen_ventas_rango("2026-06-01", "2026-06-30", categoria="gato", metodo_pago="tarjeta")
+
+        assert r["total"] == 15.0
+        assert r["cantidad_ventas"] == 1
+        assert r["total_efectivo"] == 0.0
+        assert r["total_tarjeta"] == 15.0
 
 
 class TestDetalle:

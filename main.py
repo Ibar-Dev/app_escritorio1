@@ -48,13 +48,21 @@ def main(page: ft.Page):
         3: vista_email.construir(),
     }
 
+    indice_actual = 0
+
     def _mostrar(indice: int) -> None:
+        nonlocal indice_actual
         drenar_tareas_ui_pendientes()
+
+        if indice_actual == 2 and indice != 2:
+            vista_ventas.on_view_deactivated()
+
         contenedor.controls = [vistas_ui[indice]]
 
         if indice == 2:
-            vista_ventas.actualizar_resumen()
-            vista_ventas.buscar()
+            vista_ventas.on_view_activated()
+
+        indice_actual = indice
 
         page.update()
         drenar_tareas_ui_pendientes()

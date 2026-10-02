@@ -129,6 +129,50 @@ def historial_ventas(
         return _filas_a_decimal([dict(row) for row in cur.fetchall()])
 
 
+def resumen_ventas_rango(
+    desde: str,
+    hasta: str,
+    categoria: str | None = None,
+    metodo_pago: str | None = None,
+) -> dict[str, Any]:
+    """Resumen de ventas activas para un rango y filtros opcionales."""
+    inicializar_db_ventas()
+    with _connect() as conn:
+        row = conn.execute(
+            """SELECT
+                   COALESCE(SUM(monto), 0) AS total,
+                   COUNT(DISTINCT numero_factura) AS cantidad_ventas,
+                   COALESCE(SUM(CASE WHEN metodo_pago IN ('efectivo','mixto') THEN monto ELSE 0 END), 0) AS total_efectivo,
+                   COALESCE(SUM(CASE WHEN metodo_pago IN ('tarjeta','mixto')  THEN monto ELSE 0 END), 0) AS total_tarjeta
+               FROM ventas
+               WHERE fecha_venta BETWEEN ? AND ?
+                 AND estado = 'activa'
+                 AND (? IS NULL OR categoria = ?)
+                 AND (? IS NULL OR metodo_pago = ?)""",
+            (desde, hasta, categoria, categoria, metodo_pago, metodo_pago),
+        ).fetchone()
+
+        cat_rows = conn.execute(
+            """SELECT categoria, SUM(monto) AS total
+               FROM ventas
+               WHERE fecha_venta BETWEEN ? AND ?
+                 AND estado = 'activa'
+                 AND (? IS NULL OR categoria = ?)
+                 AND (? IS NULL OR metodo_pago = ?)
+               GROUP BY categoria""",
+            (desde, hasta, categoria, categoria, metodo_pago, metodo_pago),
+        ).fetchall()
+
+    total = from_cents(row["total"])
+    return {
+        "total": total,
+        "cantidad_ventas": int(row["cantidad_ventas"]),
+        "total_efectivo": from_cents(row["total_efectivo"]),
+        "total_tarjeta": from_cents(row["total_tarjeta"]),
+        "por_categoria": {r["categoria"]: from_cents(r["total"]) for r in cat_rows},
+    }
+
+
 def _filas_a_decimal(filas: list[dict]) -> list[dict]:
     """Convierte el campo monto_lineas de céntimos a Decimal en resultados de historial."""
     for f in filas:
